@@ -1,0 +1,17 @@
+services:
+  spa:
+    build: backend
+    container_name: backend
+    ports: 
+      - "8001:8001"
+    volumes:
+      - ./backend/spaproject:/app
+
+  frontend:
+    build: frontend
+    container_name: frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend/static_vol:/var/www/html

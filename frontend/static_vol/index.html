@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>User Dashboard</title>
+
+    <style>
+        #auth-section,
+        #logout-user,
+        #user-profile {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>User Dashboard</h1>
+
+    <div id="user-auth">
+        <h2>Register New User</h2>
+        <input type="text" id="new-username" placeholder="Enter username">
+        <input type="email" id="new-email" placeholder="Enter email">
+        <input type="password" id="new-password" placeholder="Enter password">
+        <input type="password" id="confirm-password" placeholder="Confirm password">
+        <button id="register-user">Register User</button>
+
+        <h2>Login</h2>
+        <input type="text" id="login-username" placeholder="Enter username">
+        <input type="password" id="login-password" placeholder="Enter password">
+        <button id="login-user">Login</button>
+    </div>
+
+    <div id="user-profile">
+        <h2>User Profile Information</h2>
+        <!-- User profile data will be displayed here -->
+    </div>
+
+    <button id="logout-user" style="display:none;">Logout</button>
+    <button id="delete-user-button" style="display:none;">Delete User</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            checkLoginStatus();
+        });
+
+        function sendApiRequest(url, data = {}, method = 'POST', csrfToken = getCookie('csrftoken')) {
+            const headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            };
+
+            if (method === 'POST' && csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+
+            const options = {
+                method: method,
+                headers: headers,
+                credentials: 'include',
+            };
+
+            if (method !== 'GET') {
+                options.body = Object.keys(data).map(key =>
+                    `${encodeURIComponent(key)}=${encodeURIComponent(data[key])}`
+                ).join('&');
+            }
+
+            return fetch(url, options)
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    } else {
+                        throw new Error('Failed to fetch profile: ' + response.statusText);
+                    }
+                });
+        }
+
+        document.getElementById('register-user').addEventListener('click', function () {
+            const username = document.getElementById('new-username').value;
+            const email = document.getElementById('new-email').value;
+            const password = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            if (password !== confirmPassword) {
+                alert("Passwords do not match!");
+                return;
+            }
+            sendApiRequest('/api/register/', { username, email, password })
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        // alert('User registered successfully');
+                        clearForm();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to register user');
+                });
+        });
+
+        document.getElementById('login-user').addEventListener('click', function () {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            sendApiRequest('/api/login/', { username, password })
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        // alert('Login successful');
+                        document.getElementById('logout-user').style.display = 'block';
+                        document.getElementById('delete-user-button').style.display = 'block';
+                        document.getElementById('user-auth').style.display = 'none';
+                        document.getElementById('user-profile').style.display = 'block';
+                        fetchUserProfile();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Login failed');
+                });
+        });
+
+        document.getElementById('logout-user').addEventListener('click', function () {
+            sendApiRequest('/api/logout/', {}, 'POST')
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        // alert('Logout successful');
+                        document.getElementById('logout-user').style.display = 'none';
+                        document.getElementById('user-profile').innerHTML = '';
+                        document.getElementById('user-auth').style.display = 'block';
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        });
+
+        document.getElementById('delete-user-button').addEventListener('click', function () {
+            if (confirm('Are you sure you want to delete your account?')) { // カスタムモーダルに変更する方がよさそう
+                sendApiRequest('/api/delete/', {}, 'POST')
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            // alert('User deleted successfully');
+                            document.getElementById('logout-user').style.display = 'none';
+                            document.getElementById('user-profile').innerHTML = '';
+                            document.getElementById('user-auth').style.display = 'block';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Failed to delete user account.');
+                    });
+            }
+        });
+
+        function checkLoginStatus() {
+            sendApiRequest('/api/check_login/', {}, 'GET')
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        if (data.is_loggedin) {
+                            document.getElementById('logout-user').style.display = 'block';
+                            document.getElementById('user-auth').style.display = 'none';
+                            document.getElementById('user-profile').style.display = 'block';
+                            document.getElementById('delete-user-button').style.display = 'block';
+                            fetchUserProfile();
+                        } else {
+                            document.getElementById('logout-user').style.display = 'none';
+                            document.getElementById('user-profile').innerHTML = '';
+                            document.getElementById('user-auth').style.display = 'block';
+                            document.getElementById('delete-user-button').style.display = 'none';
+                        }
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function fetchUserProfile() {
+            sendApiRequest('/api/userProfile/', {}, 'GET')
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        let content = `Username: ${data.username}<br>Email: ${data.email}<br>Level: ${data.level}<br>Play Count: ${data.play_count}<br>Win Count: ${data.win_count}`;
+                        document.getElementById('user-profile').innerHTML = content;
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function clearForm() {
+            document.getElementById('new-username').value = '';
+            document.getElementById('new-email').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+        }
+    </script>
+</body>
+
+</html>
