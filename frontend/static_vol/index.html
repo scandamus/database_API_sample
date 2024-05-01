@@ -70,7 +70,9 @@
                     if (response.ok) {
                         return response.json();
                     } else {
-                        throw new Error('Failed to fetch profile: ' + response.statusText);
+                        return response.json().then(errorData => {
+                            throw new Error(errorData.error || 'Unknown error occured')
+                        });
                     }
                 });
         }
@@ -87,16 +89,12 @@
             }
             sendApiRequest('/api/register/', { username, email, password })
                 .then(data => {
-                    if (data.error) {
-                        alert(data.error);
-                    } else {
                         // alert('User registered successfully');
                         clearForm();
-                    }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Failed to register user');
+                    alert(error.message);
                 });
         });
 

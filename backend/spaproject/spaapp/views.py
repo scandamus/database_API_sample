@@ -9,6 +9,11 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
+
+import logging
+
+logger = logging.getLogger('spaapp')
+
 # Create your views here.
 def getUserProfile(request, username):
     try:
@@ -49,9 +54,15 @@ def registerUser(request):
             email = data.get('email')
             password = data.get('password')
 
-            validate_password(password, request.user)
+            try:
+                validate_password(password, request.user)
+            except ValidationError as ve:
+                error_message = ' '.join(ve.messages)
+                logger.error(f'Password validation error: {error_message}')
+                return JsonResponse({'error': error_message}, status=400)
 
             if User.objects.filter(username=username).exists():
+                logger.error('Username already exists error')
                 return JsonResponse({'error': 'Username already exists'}, status=400)
 
             user = User.objects.create(
@@ -63,8 +74,10 @@ def registerUser(request):
 
             return JsonResponse({'message': 'User created successfully'}, status=201)
         except Exception as e:
+            logger.exception('Unexpected error')
             return JsonResponse({'error': str(e)}, status=500)
     else:
+        logger.error('Invalid request error')
         return JsonResponse({'error': 'Invalid request'}, status=400)
 
 def loginUser(request):
